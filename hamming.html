@@ -1,0 +1,312 @@
+<head>
+	<style>
+		td {
+			width: 40px;
+			height: 40px;
+		}
+	</style>
+</head>
+<body>
+	<table id="hammingTable"></table>
+	<script>
+		
+		function padBinString(string, targetLength){
+			var paddedString = "";
+			for(var i=0; i<targetLength-string.length; i++){
+				paddedString = paddedString+"0"
+			}
+			paddedString = paddedString + string;
+			return paddedString;
+		}
+		
+		function getIndexByCoords(x,y,rowLength){
+			return y*rowLength + x;
+		}
+		
+		function getParities(data){ //this should get refactored out so it's not repeated code
+			var totalParity = 0;
+			var parityInt = 0
+			var parities = [];
+			for(var errorBitCount=0; errorBitCount<Math.log2(data.length); errorBitCount++){
+				parities.push(0);
+			}
+			for(var bitPosition=0; bitPosition<data.length; bitPosition++){
+				if(data[bitPosition] == 1){ //if it contains a one
+					parityInt = parityInt ^ bitPosition;
+					totalParity = (totalParity + 1) % 2
+				}
+			}
+			var parityString = padBinString(parityInt.toString(2), parities.length);
+			for(var i=0; i<parityString.length; i++){
+				parities[i] = parseInt(parityString[parityString.length-i-1]);
+			}
+			return [totalParity,parities];
+		}
+		
+		class ErrorChecker {
+			constructor(){}
+			
+			getData(rowLength){
+				var parsedData = [];
+				for(var y=0;y<rowLength;y++){
+					for(var x=0;x<rowLength;x++){
+						parsedData.push(document.getElementById(x.toString()+","+y.toString()).innerHTML);
+					}
+				}
+				return parsedData;
+			}
+			
+			checkForErrors(parities){
+				console.log(parities);
+				if(parities[0]==1){
+					return true;
+				}
+				for(var i=0; i<parities[1].length; i++){
+					if(parities[1][i]==1){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			checkParities(){
+				
+				var rowLength = document.getElementById("hammingTable").rows.length; 
+				var parsedData = this.getData(rowLength);
+				
+				var parities = getParities(parsedData);
+				var errorsDetected = this.checkForErrors(parities);
+				var errorCount = []; //each element should correspond with an element of parsedData
+				
+				for(var i=0; i<parsedData.length; i++){
+					errorCount.push(0);
+				}
+				
+				console.log(errorsDetected);
+				console.log(parities);
+				if(!errorsDetected){
+					return errorCount;
+				}
+				
+				for(var y=0; y<rowLength; y++){
+					for(var x=0; x<rowLength; x++){
+						var cell = document.getElementById((x).toString()+","+(y).toString());
+						var bitPosition = getIndexByCoords(x,y,rowLength);
+						var binaryPosition = padBinString(bitPosition.toString(2), parities[1].length);
+						console.log(binaryPosition);
+						for(var binaryPositionBit=0; binaryPositionBit<binaryPosition.length; binaryPositionBit++){
+							if(binaryPosition[binaryPosition.length-binaryPositionBit-1] == parities[1][binaryPositionBit]){
+								console.log(parities);
+								//console.log("wrong! by " + binaryPositionBit.toString());
+								errorCount[bitPosition] = errorCount[bitPosition] + 1;
+							}
+						}
+					}
+				}
+				console.log(errorCount);
+				return errorCount;
+			}
+			
+			colorTable(errorCounts){
+				var maxErrors = errorCounts.reduce(function(a, b) {
+					return Math.max(a, b);
+				}, 0); //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/max
+				var rowLength = document.getElementById("hammingTable").rows.length;  //repeated code
+				for(var y=0; y<rowLength; y++){
+					for(var x=0; x<rowLength; x++){
+						var cell = document.getElementById((x).toString()+","+(y).toString());
+						var bitPosition = getIndexByCoords(x,y,rowLength);
+						var errors = errorCounts[bitPosition];
+						cell.style.backgroundColor = "rgba(255,0,0,"+(errors/maxErrors).toString()+")";
+					}
+				}
+			}
+			
+			check(){
+				var errorCounts = this.checkParities();
+				this.colorTable(errorCounts);
+			}
+		}
+		
+		class Setup {
+			constructor(errorChecker){
+				this.errorChecker = errorChecker;
+				this.blockSize = 16;
+				this.rowLength = Math.log2(this.blockSize);
+				this.hammingBits = [];
+				this.data = this.generateData(this.blockSize);
+				this.data = this.insertHammingBits(this.data);
+				console.log(this.data);
+				this.fillTable(this.data);
+			}
+			
+			generateData(blockSize){
+				var data = [];
+				for(var bitPosition=0; bitPosition<blockSize; bitPosition++){
+					if(bitPosition == 0 || Math.log2(bitPosition) % 1 == 0){
+						data.push(0);
+						console.log(bitPosition);
+					}else{
+						data.push(this.getRandomInt(2));
+					}
+				}
+				return data;
+			}
+			
+			insertHammingBits(data){
+				var totalParity = 0;
+				var hammingBits = getParities(data);
+				console.log(hammingBits);
+				for(var errorBitIndex=0; errorBitIndex<hammingBits[1].length; errorBitIndex++){
+					var value = hammingBits[1][errorBitIndex];
+					data[2**errorBitIndex] = value;
+				}
+				for(var i=0;i<data.length;i++){
+					if(data[i]==0){
+						totalParity = (totalParity+1)%2;
+					}
+				}
+				data[0] = totalParity;
+				return data;
+			}
+			
+			getRandomInt(max) { //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+				return Math.floor(Math.random() * max);
+			}
+			
+			getBitByCoords(x,y){
+				var index = getIndexByCoords(x,y,this.rowLength);
+				return this.data[index];
+			}
+			
+			fillTable(data){
+				var table = document.getElementById("hammingTable");
+				for(var y=0;y<this.rowLength;y++){
+					const tr = hammingTable.insertRow();
+					for(var x=0;x<this.rowLength;x++){
+						const td = tr.insertCell();
+						td.id=x.toString() + "," + y.toString();
+						td.appendChild(document.createTextNode(this.getBitByCoords(x,y)));
+						td.addEventListener("click", function () {
+							console.log(this.id);
+							this.innerHTML = ((parseInt(this.innerHTML) + 1)%2).toString();
+							errorChecker.check();
+						});
+					}
+				} 
+			}
+		}
+		
+		var errorChecker = new ErrorChecker;
+		var setup = new Setup(errorChecker);
+		
+		/* function getParityBits(d){
+			var topParityBits = [0,0,0,0,0,0,0,0];
+			var sideParityBits = [];
+			for(var i=0; i<d.length; i++){
+				var dataByte=d[i];
+				rowBit = 0
+				for(var j=0; j<dataByte.length; j++){
+					if(dataByte[j] == 1){
+						rowBit+=1;
+						topParityBits[j]+=1;
+					}
+				}
+				rowBit = rowBit%2;
+				sideParityBits.push(rowBit);
+			}
+			for(var i=0; i<topParityBits.length; i++){
+				topParityBits[i] = topParityBits[i]%2;
+			}
+			return [topParityBits, sideParityBits]
+		}
+		
+		function getBitByIndex(x, y){
+			var topParityBits = originalParityBits[0]
+			var sideParityBits = originalParityBits[1]
+			if(x==0 && y==0){
+				return " ";
+			}
+			if(x==0 && y>=2){
+				return sideParityBits[y-2];
+			}
+			if(y==1){
+				return "--";
+			}
+			if(x==1){
+				return "|"
+			}
+			if(y==0 && x>=2){
+				return topParityBits[x-2];
+			}
+			return data[y-2][x-2];
+		}
+		
+		function getData(){
+			var parsedData = [];
+			for(var i=2;i<data.length+2;i++){
+				var row = [];
+				for(var j=2;j<data[0].length+2;j++){
+					row.push(document.getElementById(j.toString()+","+i.toString()).innerHTML);
+				}
+				parsedData.push(row);
+			}
+			return parsedData;
+		}
+		
+		function checkParities(){
+			var falseRows = [];
+			var falseColumns = [];
+			var parsedData = getData();
+			var newParityBits = getParityBits(parsedData);
+			for(var i=0; i<newParityBits[0].length;i++){
+				if(newParityBits[0][i] != originalParityBits[0][i]){falseColumns.push(i)}
+				if(newParityBits[1][i] != originalParityBits[1][i]){falseRows.push(i)}
+			}
+			for(var i=0; i<originalParityBits[1].length; i++){
+				for(var j=0; j<originalParityBits[0].length; j++){
+					var cell = document.getElementById((j+2).toString()+","+(i+2).toString());
+					console.log(falseRows);
+					if(falseColumns.includes(j) || falseRows.includes(i)){
+						console.log("ahh");
+						cell.style.backgroundColor = "#ff788c";
+						if(falseColumns.includes(j) && falseRows.includes(i)){
+							cell.style.backgroundColor = "#ff3b58";
+						}
+					}
+					else{
+						cell.style.backgroundColor = "white";
+					}
+				}
+			}
+		}
+		
+		function fillTable(){
+			var parityBits = getParityBits(data);
+			originalParityBits = parityBits;
+			var topParityBits = parityBits[0];
+			var sideParityBits = parityBits[1];
+			for(var i=0;i<data.length+2;i++){
+				const tr = parityTable.insertRow();
+				for(var j=0;j<data[0].length+2;j++){
+					const td = tr.insertCell();
+					td.id=j.toString() + "," + i.toString();
+					td.appendChild(document.createTextNode(getBitByIndex(j,i)));
+					td.classList.add("x"+j.toString());
+					td.classList.add("y"+i.toString());
+					if(i>=2 && j>=2){
+						td.addEventListener("click", function () {
+							console.log(this.id);
+							this.innerHTML = ((parseInt(this.innerHTML) + 1)%2).toString();
+							checkParities();
+						});
+					}
+				}
+			} 
+		}
+		
+		fillTable() */
+		
+		
+	</script>
+</body>

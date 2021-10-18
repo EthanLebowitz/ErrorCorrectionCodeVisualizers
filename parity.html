@@ -1,0 +1,128 @@
+<head>
+	<style>
+		td {
+			width: 40px;
+			height: 40px;
+		}
+	</style>
+</head>
+<body>
+	<table id="parity"></table>
+	<script>
+		
+		var data = [[0,1,1,0,1,1,1,1], [1,0,0,0,0,1,0,1], [1,0,0,1,0,1,1,1], [1,0,1,1,0,1,1,0], [0,0,1,1,0,0,1,0], [0,1,1,1,0,0,1,1], [1,0,0,1,0,1,1,1], [1,1,0,1,0,0,0,1]];
+		var originalParityBits = []
+		
+		const parityTable = document.getElementById("parity");
+		
+		
+		function getParityBits(d){
+			var topParityBits = [0,0,0,0,0,0,0,0];
+			var sideParityBits = [];
+			for(var i=0; i<d.length; i++){
+				var dataByte=d[i];
+				rowBit = 0
+				for(var j=0; j<dataByte.length; j++){
+					if(dataByte[j] == 1){
+						rowBit+=1;
+						topParityBits[j]+=1;
+					}
+				}
+				rowBit = rowBit%2;
+				sideParityBits.push(rowBit);
+			}
+			for(var i=0; i<topParityBits.length; i++){
+				topParityBits[i] = topParityBits[i]%2;
+			}
+			return [topParityBits, sideParityBits]
+		}
+		
+		function getBitByIndex(x, y){
+			var topParityBits = originalParityBits[0]
+			var sideParityBits = originalParityBits[1]
+			if(x==0 && y==0){
+				return " ";
+			}
+			if(x==0 && y>=2){
+				return sideParityBits[y-2];
+			}
+			if(y==1){
+				return "--";
+			}
+			if(x==1){
+				return "|"
+			}
+			if(y==0 && x>=2){
+				return topParityBits[x-2];
+			}
+			return data[y-2][x-2];
+		}
+		
+		function getData(){
+			var parsedData = [];
+			for(var i=2;i<data.length+2;i++){
+				var row = [];
+				for(var j=2;j<data[0].length+2;j++){
+					row.push(document.getElementById(j.toString()+","+i.toString()).innerHTML);
+				}
+				parsedData.push(row);
+			}
+			return parsedData;
+		}
+		
+		function checkParities(){
+			var falseRows = [];
+			var falseColumns = [];
+			var parsedData = getData();
+			var newParityBits = getParityBits(parsedData);
+			for(var i=0; i<newParityBits[0].length;i++){
+				if(newParityBits[0][i] != originalParityBits[0][i]){falseColumns.push(i)}
+				if(newParityBits[1][i] != originalParityBits[1][i]){falseRows.push(i)}
+			}
+			for(var i=0; i<originalParityBits[1].length; i++){
+				for(var j=0; j<originalParityBits[0].length; j++){
+					var cell = document.getElementById((j+2).toString()+","+(i+2).toString());
+					console.log(falseRows);
+					if(falseColumns.includes(j) || falseRows.includes(i)){
+						console.log("ahh");
+						cell.style.backgroundColor = "#ff788c";
+						if(falseColumns.includes(j) && falseRows.includes(i)){
+							cell.style.backgroundColor = "#ff3b58";
+						}
+					}
+					else{
+						cell.style.backgroundColor = "white";
+					}
+				}
+			}
+		}
+		
+		function fillTable(){
+			var parityBits = getParityBits(data);
+			originalParityBits = parityBits;
+			var topParityBits = parityBits[0];
+			var sideParityBits = parityBits[1];
+			for(var i=0;i<data.length+2;i++){
+				const tr = parityTable.insertRow();
+				for(var j=0;j<data[0].length+2;j++){
+					const td = tr.insertCell();
+					td.id=j.toString() + "," + i.toString();
+					td.appendChild(document.createTextNode(getBitByIndex(j,i)));
+					td.classList.add("x"+j.toString());
+					td.classList.add("y"+i.toString());
+					if(i>=2 && j>=2){
+						td.addEventListener("click", function () {
+							console.log(this.id);
+							this.innerHTML = ((parseInt(this.innerHTML) + 1)%2).toString();
+							checkParities();
+						});
+					}
+				}
+			} 
+		}
+		
+		fillTable()
+		
+		
+	</script>
+</body>
